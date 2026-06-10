@@ -127,15 +127,17 @@ export async function GET() {
     PLATFORMS.map(async ({ platform, envHandle, demo }) => {
       const handle = process.env[envHandle]?.trim();
       if (!apiKey || !handle) return demo;
-      try {
-        return await fetchProfile(platform, handle, apiKey);
-      } catch (err) {
-        return {
-          ...demo,
-          handle,
-          error: err instanceof Error ? err.message : "fetch failed",
-        };
+      // LinkedIn's scraper is flaky (authwall throttling) — retry once
+      const attempts = platform === "linkedin" ? 2 : 1;
+      let lastError = "fetch failed";
+      for (let i = 0; i < attempts; i++) {
+        try {
+          return await fetchProfile(platform, handle, apiKey);
+        } catch (err) {
+          lastError = err instanceof Error ? err.message : "fetch failed";
+        }
       }
+      return { ...demo, handle, error: lastError };
     })
   );
 
