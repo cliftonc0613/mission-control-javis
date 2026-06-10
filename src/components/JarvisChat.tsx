@@ -27,9 +27,9 @@ const fetcher = (url: string) => fetch(url).then((r) => r.json());
 type VoiceMode = "off" | "system" | "clone";
 
 const VOICE_MODE_LABELS: Record<VoiceMode, string> = {
-  off: "🔇 VOICE OFF",
-  system: "🔊 SYSTEM",
-  clone: "🗣 CLIFTON",
+  off: "OFF",
+  system: "SYSTEM",
+  clone: "CLIFTON CLONE",
 };
 
 /** strip markdown/code noise so TTS reads cleanly */
@@ -119,16 +119,6 @@ export default function JarvisChat() {
   function selectOpenRouterModel(next: string) {
     setOpenRouterModel(next);
     localStorage.setItem("jarvis-openrouter-model", next);
-  }
-
-  function cycleVoiceMode() {
-    const order: VoiceMode[] = voiceboxOnline
-      ? ["off", "system", "clone"]
-      : ["off", "system"];
-    const next = order[(order.indexOf(voiceMode) + 1) % order.length];
-    setVoiceMode(next);
-    localStorage.setItem("jarvis-voice-mode", next);
-    stopSpeaking();
   }
 
   function stopSpeaking() {
@@ -323,24 +313,43 @@ export default function JarvisChat() {
             </button>
           );
         })}
-        <button
-          type="button"
-          onClick={cycleVoiceMode}
-          title={
-            voiceMode === "clone"
-              ? "Jarvis speaks with your Voicebox cloned voice"
-              : voiceMode === "system"
-                ? "Jarvis speaks with the browser system voice"
-                : "Voice replies disabled — click to cycle"
-          }
-          className={`px-2 py-1 text-[9px] tracking-widest border transition-colors ${
-            voiceMode !== "off"
-              ? "border-hud-orange bg-hud-orange/15 text-hud-orange text-glow font-bold"
-              : "border-hud-orange/30 text-hud-orange/50 hover:border-hud-orange/60"
-          } ${synthesizing ? "mic-active" : ""}`}
-        >
-          {synthesizing ? "⏳ SYNTH…" : VOICE_MODE_LABELS[voiceMode]}
-        </button>
+        <span className="text-[9px] tracking-[0.3em] text-hud-orange/50 ml-2">
+          VOICE:
+        </span>
+        {(["off", "system", "clone"] as VoiceMode[]).map((mode) => {
+          const disabled = mode === "clone" && !voiceboxOnline;
+          const active = voiceMode === mode;
+          return (
+            <button
+              key={mode}
+              type="button"
+              disabled={disabled}
+              onClick={() => {
+                setVoiceMode(mode);
+                localStorage.setItem("jarvis-voice-mode", mode);
+                stopSpeaking();
+              }}
+              title={
+                mode === "clone"
+                  ? disabled
+                    ? "Launch the Voicebox app to enable your cloned voice"
+                    : "Jarvis speaks with your Voicebox cloned voice (~15s synth per reply)"
+                  : mode === "system"
+                    ? "Jarvis speaks instantly with the browser voice"
+                    : "Voice replies disabled"
+              }
+              className={`px-2 py-1 text-[9px] tracking-widest border transition-colors ${
+                active
+                  ? "border-hud-orange bg-hud-orange/15 text-hud-orange text-glow font-bold"
+                  : "border-hud-orange/30 text-hud-orange/50 hover:border-hud-orange/60 hover:text-hud-orange/80"
+              } ${disabled ? "opacity-30 cursor-not-allowed" : ""} ${
+                synthesizing && active ? "mic-active" : ""
+              }`}
+            >
+              {synthesizing && active ? "SYNTH…" : VOICE_MODE_LABELS[mode]}
+            </button>
+          );
+        })}
         {provider === "openrouter" ? (
           <select
             value={openRouterModel || activeInfo?.model || ""}
