@@ -1,11 +1,28 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import useSWR from "swr";
 
 interface ChatMessage {
   role: "user" | "assistant";
   content: string;
 }
+
+type Provider = "anthropic" | "openai" | "openrouter";
+
+interface ProviderInfo {
+  id: Provider;
+  model: string;
+  configured: boolean;
+}
+
+const PROVIDER_LABELS: Record<Provider, string> = {
+  anthropic: "CLAUDE",
+  openai: "CHATGPT",
+  openrouter: "OPENROUTER",
+};
+
+const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
 // Minimal Web Speech API typings (not in lib.dom for all TS configs)
 interface SpeechRecognitionLike {
@@ -36,8 +53,27 @@ export default function JarvisChat() {
   const [input, setInput] = useState("");
   const [streaming, setStreaming] = useState(false);
   const [listening, setListening] = useState(false);
+  const [provider, setProvider] = useState<Provider>("anthropic");
   const scrollRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
+
+  const { data: providerData } = useSWR<{ providers: ProviderInfo[] }>(
+    "/api/jarvis",
+    fetcher
+  );
+  const providers = providerData?.providers ?? [];
+  const activeInfo = providers.find((p) => p.id === provider);
+
+  // restore last-used provider
+  useEffect(() => {
+    const saved = localStorage.getItem("jarvis-provider") as Provider | null;
+    if (saved && saved in PROVIDER_LABELS) setProvider(saved);
+  }, []);
+
+  function selectProvider(next: Provider) {
+    setProvider(next);
+    localStorage.setItem("jarvis-provider", next);
+  }
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
@@ -56,7 +92,7 @@ export default function JarvisChat() {
       const res = await fetch("/api/jarvis", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages: history }),
+        body: JSON.stringify({ messages: history, provider }),
       });
 
       if (!res.ok || !res.body) {
@@ -133,6 +169,48 @@ export default function JarvisChat() {
 
   return (
     <div className="flex flex-col h-full min-h-0">
+      {/* ── Provider selector ───────────────────────────── */}
+      <div className="flex items-center gap-1 mb-2 flex-wrap">
+        <span className="text-[9px] tracking-[0.3em] text-hud-orange/50 mr-1">
+          AI CORE:
+        </span>
+        {(Object.keys(PROVIDER_LABELS) as Provider[]).map((id) => {
+          const info = providers.find((p) => p.id === id);
+          const active = provider === id;
+          return (
+            <button
+              key={id}
+              type="button"
+              onClick={() => selectProvider(id)}
+              title={
+                info
+                  ? `${info.model}${info.configured ? "" : " — API key missing"}`
+                  : id
+              }
+              className={`px-2 py-1 text-[9px] tracking-widest border transition-colors ${
+                active
+                  ? "border-hud-orange bg-hud-orange/15 text-hud-orange text-glow font-bold"
+                  : "border-hud-orange/30 text-hud-orange/50 hover:border-hud-orange/60 hover:text-hud-orange/80"
+              }`}
+            >
+              {PROVIDER_LABELS[id]}
+              <span
+                className={`ml-1 ${
+                  info?.configured ? "text-glow-white" : "text-hud-orange/30"
+                }`}
+              >
+                {info?.configured ? "●" : "○"}
+              </span>
+            </button>
+          );
+        })}
+        {activeInfo && (
+          <span className="text-[9px] text-hud-orange/40 ml-auto truncate max-w-[40%]">
+            {activeInfo.model}
+          </span>
+        )}
+      </div>
+
       <div
         ref={scrollRef}
         className="flex-1 overflow-y-auto space-y-3 pr-1 min-h-0 text-[13px] leading-relaxed"

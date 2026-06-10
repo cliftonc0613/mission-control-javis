@@ -12,15 +12,19 @@ The dashboard works out of the box with **zero credentials** — system telemetr
 
 ---
 
-## 1. Anthropic API Key (Jarvis chat)
+## 1. Jarvis AI Providers (chat)
 
-1. Go to [console.anthropic.com](https://console.anthropic.com) → **API Keys** → **Create Key**.
-2. Add to `.env.local`:
-   ```
-   ANTHROPIC_API_KEY=sk-ant-...
-   ```
+Jarvis supports **three AI providers** — configure any or all, then switch between them with the **AI CORE** selector buttons at the top of the chat panel (● = key configured, ○ = missing). Your choice is remembered between sessions.
 
-Jarvis uses `claude-sonnet-4-6` with streaming responses. Voice input uses the browser Web Speech API (Chrome/Edge) — hold the 🎙 button to speak.
+| Provider | Get a key | Env vars | Default model |
+|---|---|---|---|
+| **CLAUDE** (Anthropic) | [console.anthropic.com](https://console.anthropic.com) | `ANTHROPIC_API_KEY`, optional `ANTHROPIC_MODEL` | `claude-sonnet-4-6` |
+| **CHATGPT** (OpenAI) | [platform.openai.com/api-keys](https://platform.openai.com/api-keys) | `OPENAI_API_KEY`, optional `OPENAI_MODEL` | `gpt-4o` |
+| **OPENROUTER** (any model) | [openrouter.ai/keys](https://openrouter.ai/keys) | `OPENROUTER_API_KEY`, optional `OPENROUTER_MODEL` | `anthropic/claude-sonnet-4` |
+
+OpenRouter gives you one key for hundreds of models (Claude, GPT, Gemini, Llama, DeepSeek…) — set `OPENROUTER_MODEL` to any [model slug](https://openrouter.ai/models), e.g. `google/gemini-2.5-pro` or `meta-llama/llama-4-maverick`.
+
+All providers stream responses. Voice input uses the browser Web Speech API (Chrome/Edge) — hold the 🎙 button to speak.
 
 ---
 
