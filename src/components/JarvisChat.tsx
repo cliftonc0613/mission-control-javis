@@ -398,6 +398,35 @@ export default function JarvisChat() {
     recognitionRef.current?.stop();
   }
 
+  // Hold Option (Alt) anywhere on the page to talk, release to send
+  const startListeningRef = useRef(startListening);
+  const stopListeningRef = useRef(stopListening);
+  startListeningRef.current = startListening;
+  stopListeningRef.current = stopListening;
+
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== "Alt" || e.repeat) return;
+      e.preventDefault();
+      startListeningRef.current();
+    };
+    const onKeyUp = (e: KeyboardEvent) => {
+      if (e.key !== "Alt") return;
+      stopListeningRef.current();
+    };
+    // releasing Option outside the window would otherwise leave the mic stuck on
+    const onBlur = () => stopListeningRef.current();
+
+    window.addEventListener("keydown", onKeyDown);
+    window.addEventListener("keyup", onKeyUp);
+    window.addEventListener("blur", onBlur);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("keyup", onKeyUp);
+      window.removeEventListener("blur", onBlur);
+    };
+  }, []);
+
   return (
     <div className="flex flex-col h-full min-h-0">
       {/* ── Provider selector ───────────────────────────── */}
@@ -547,7 +576,7 @@ export default function JarvisChat() {
             startListening();
           }}
           onTouchEnd={stopListening}
-          title="Hold to speak"
+          title="Hold to speak (or hold ⌥ Option)"
           className={`shrink-0 w-10 h-10 border border-hud-orange/60 text-hud-orange hover:bg-hud-orange/10 transition-colors ${
             listening ? "mic-active bg-hud-orange/20" : ""
           }`}
@@ -557,7 +586,7 @@ export default function JarvisChat() {
         <input
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          placeholder={listening ? "LISTENING…" : "COMMAND INPUT…"}
+          placeholder={listening ? "LISTENING…" : "COMMAND INPUT… [HOLD ⌥ TO SPEAK]"}
           className="flex-1 bg-transparent border border-hud-orange/40 px-3 py-2 text-sm text-white placeholder:text-hud-orange/40 focus:outline-none focus:border-hud-orange focus:shadow-[0_0_10px_rgba(246,102,2,0.4)]"
         />
         <button
