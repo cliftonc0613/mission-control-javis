@@ -379,7 +379,7 @@ export default function JarvisChat() {
 
       <div
         ref={scrollRef}
-        className="flex-1 overflow-y-auto space-y-3 pr-1 min-h-0 text-[13px] leading-relaxed"
+        className="h-[230px] lg:h-[260px] overflow-y-auto space-y-3 pr-1 text-[13px] leading-relaxed"
       >
         {messages.map((msg, i) => (
           <div key={i}>

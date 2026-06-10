@@ -43,11 +43,11 @@ export default function MissionControl() {
         {/* Center — Arc reactor + Jarvis */}
         <div className="col-span-12 md:col-span-9 lg:col-span-6">
           <HudPanel delay={0} className="h-full flex flex-col">
-            <ArcReactor size={190} />
+            <ArcReactor size={150} />
             <div className="text-center text-[9px] tracking-[0.5em] text-hud-orange/50 -mt-2 mb-3">
               ARC REACTOR CORE — STABLE
             </div>
-            <div className="flex-1 min-h-[280px] flex flex-col">
+            <div className="flex flex-col">
               <h2 className="hud-panel-title">Jarvis Interface</h2>
               <JarvisChat />
             </div>
