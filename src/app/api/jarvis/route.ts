@@ -11,34 +11,36 @@ interface ChatMessage {
   content: string;
 }
 
-// Caveman skill (https://github.com/JuliusBrussee/caveman) — ultra-terse replies,
-// full technical accuracy. The installed skill file is the source of truth.
+// Prompt layers loaded from files at startup so personality and style are
+// editable without code changes (restart dev server to pick up edits):
+//   SOUL.md  — who JARVIS is (identity, tone, values)
+//   .claude/skills/caveman/SKILL.md — how he delivers it (ultra-terse,
+//   https://github.com/JuliusBrussee/caveman)
+function loadPromptFile(relativePath: string, fallback: string): string {
+  try {
+    const raw = readFileSync(join(process.cwd(), relativePath), "utf8");
+    // strip YAML frontmatter if present; the body is the instruction set
+    return raw.replace(/^---[\s\S]*?---\s*/, "").trim();
+  } catch {
+    return fallback;
+  }
+}
+
+const SOUL_FALLBACK = `You are JARVIS, the personal AI of Clifton Canady — operating inside the CLIFTON AI Mission Control dashboard.
+Speak with the calm, dry wit and impeccable competence of Tony Stark's JARVIS. Address the user as "sir" occasionally.
+Keep responses concise since they render in a compact HUD chat panel.
+You can discuss anything: business strategy, code, scheduling, marketing, or casual conversation.`;
+
 const CAVEMAN_FALLBACK = `Respond terse like smart caveman. All technical substance stay. Only fluff die.
 Drop: articles (a/an/the), filler (just/really/basically/actually/simply), pleasantries, hedging.
 Fragments OK. Short synonyms. Technical terms exact. Code blocks unchanged. Errors quoted exact.
 Pattern: [thing] [action] [reason]. [next step].
 Drop caveman only for: security warnings, irreversible action confirmations, or when compression creates ambiguity — then resume.`;
 
-function loadCavemanRules(): string {
-  try {
-    const raw = readFileSync(
-      join(process.cwd(), ".claude", "skills", "caveman", "SKILL.md"),
-      "utf8"
-    );
-    // strip YAML frontmatter; the body is the actual instruction set
-    return raw.replace(/^---[\s\S]*?---\s*/, "").trim();
-  } catch {
-    return CAVEMAN_FALLBACK;
-  }
-}
-
-const SYSTEM_PROMPT = `You are JARVIS, the personal AI of Clifton Canady — operating inside the CLIFTON AI Mission Control dashboard.
-Speak with the calm, dry wit and impeccable competence of Tony Stark's JARVIS. Address the user as "sir" occasionally.
-Keep responses concise since they render in a compact HUD chat panel.
-You can discuss anything: business strategy, code, scheduling, marketing, or casual conversation.
+const SYSTEM_PROMPT = `${loadPromptFile("SOUL.md", SOUL_FALLBACK)}
 
 CAVEMAN MODE — permanently active for every reply (persona stays JARVIS, delivery goes caveman):
-${loadCavemanRules()}`;
+${loadPromptFile(join(".claude", "skills", "caveman", "SKILL.md"), CAVEMAN_FALLBACK)}`;
 
 const PROVIDER_CONFIG: Record<
   Provider,
