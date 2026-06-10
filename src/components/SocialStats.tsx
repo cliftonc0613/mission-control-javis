@@ -1,7 +1,6 @@
 "use client";
 
 import useSWR from "swr";
-import HudPanel from "@/components/HudPanel";
 import AnimatedCounter from "@/components/AnimatedCounter";
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
@@ -19,67 +18,63 @@ interface SocialStat {
 const ICONS: Record<string, string> = {
   instagram: "◉",
   twitter: "𝕏",
-  linkedin: "in",
   facebook: "f",
 };
 
 const LABELS: Record<string, string> = {
   instagram: "INSTAGRAM",
   twitter: "TWITTER / X",
-  linkedin: "LINKEDIN",
   facebook: "FACEBOOK",
 };
 
-function SocialCard({ stat, delay }: { stat: SocialStat; delay: number }) {
+function SocialRow({ stat }: { stat: SocialStat }) {
   return (
-    <HudPanel title={LABELS[stat.platform] ?? stat.platform} delay={delay}>
-      <div className="flex items-start justify-between">
-        <div className="text-2xl text-glow font-display w-8">
-          {ICONS[stat.platform] ?? "◆"}
+    <div className="border-b border-hud-orange/20 last:border-b-0 py-2.5">
+      <div className="flex items-center justify-between mb-1.5">
+        <div className="flex items-center gap-2">
+          <span className="text-base text-glow font-display w-5 text-center">
+            {ICONS[stat.platform] ?? "◆"}
+          </span>
+          <span className="text-[10px] tracking-[0.25em] text-hud-orange/80 font-bold">
+            {LABELS[stat.platform] ?? stat.platform}
+          </span>
         </div>
         <span
-          className={`text-[9px] tracking-widest ${
+          className={`text-[8px] tracking-widest ${
             stat.live ? "text-glow-white" : "text-hud-orange/40"
           }`}
+          title={stat.error}
         >
           {stat.live ? "● LIVE" : "○ DEMO"}
         </span>
       </div>
-
-      <div className="mt-2 space-y-2 text-[11px]">
+      <div className="grid grid-cols-3 gap-1 pl-7">
         <div>
-          <div className="text-xl font-bold text-glow-white">
+          <div className="text-sm font-bold text-glow-white leading-tight">
             <AnimatedCounter value={stat.followers} />
           </div>
-          <div className="text-hud-orange/60 tracking-widest text-[9px]">
+          <div className="text-[8px] tracking-widest text-hud-orange/50">
             FOLLOWERS
           </div>
         </div>
-        <div className="grid grid-cols-2 gap-2">
-          <div>
-            <div className="text-glow font-bold">
-              <AnimatedCounter value={stat.posts} />
-            </div>
-            <div className="text-hud-orange/60 text-[9px] tracking-widest">
-              POSTS
-            </div>
+        <div>
+          <div className="text-sm font-bold text-glow leading-tight">
+            <AnimatedCounter value={stat.posts} />
           </div>
-          <div>
-            <div className="text-glow font-bold">
-              <AnimatedCounter value={stat.engagement} suffix="%" decimals={1} />
-            </div>
-            <div className="text-hud-orange/60 text-[9px] tracking-widest">
-              ENGAGEMENT
-            </div>
+          <div className="text-[8px] tracking-widest text-hud-orange/50">
+            POSTS
+          </div>
+        </div>
+        <div>
+          <div className="text-sm font-bold text-glow leading-tight">
+            <AnimatedCounter value={stat.engagement} suffix="%" decimals={1} />
+          </div>
+          <div className="text-[8px] tracking-widest text-hud-orange/50">
+            ENGAGE
           </div>
         </div>
       </div>
-      {stat.error && (
-        <p className="mt-2 text-[9px] text-hud-orange/40 truncate" title={stat.error}>
-          ⚠ {stat.error}
-        </p>
-      )}
-    </HudPanel>
+    </div>
   );
 }
 
@@ -90,19 +85,19 @@ export default function SocialStats() {
 
   const stats = data?.stats ?? [];
 
+  if (stats.length === 0) {
+    return (
+      <p className="text-[10px] animate-pulse tracking-widest">
+        SCANNING NETWORKS…
+      </p>
+    );
+  }
+
   return (
-    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-      {stats.length === 0
-        ? Array.from({ length: 4 }).map((_, i) => (
-            <HudPanel key={i} title="ACQUIRING" delay={0.5 + i * 0.1}>
-              <p className="text-[10px] animate-pulse tracking-widest">
-                SCANNING NETWORKS…
-              </p>
-            </HudPanel>
-          ))
-        : stats.map((s, i) => (
-            <SocialCard key={s.platform} stat={s} delay={0.5 + i * 0.1} />
-          ))}
+    <div>
+      {stats.map((s) => (
+        <SocialRow key={s.platform} stat={s} />
+      ))}
     </div>
   );
 }

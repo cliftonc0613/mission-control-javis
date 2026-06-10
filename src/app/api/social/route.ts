@@ -26,11 +26,6 @@ const PLATFORMS: { platform: string; envHandle: string; demo: SocialStat }[] = [
     demo: { platform: "twitter", handle: "demo", followers: 8932, posts: 1287, engagement: 2.8, live: false },
   },
   {
-    platform: "linkedin",
-    envHandle: "SOCIAL_LINKEDIN_HANDLE",
-    demo: { platform: "linkedin", handle: "demo", followers: 5621, posts: 198, engagement: 6.1, live: false },
-  },
-  {
     platform: "facebook",
     envHandle: "SOCIAL_FACEBOOK_HANDLE",
     demo: { platform: "facebook", handle: "demo", followers: 3204, posts: 456, engagement: 1.9, live: false },
@@ -48,17 +43,10 @@ function pick(obj: Record<string, unknown> | undefined, keys: string[]): number 
   return 0;
 }
 
-// Facebook and LinkedIn profile endpoints take a full `url`; the rest take `handle`.
+// Facebook's profile endpoint takes a full page `url`; the rest take `handle`.
 function profileQuery(platform: string, handle: string): string {
   if (platform === "facebook") {
     return `url=${encodeURIComponent(`https://www.facebook.com/${handle}`)}`;
-  }
-  if (platform === "linkedin") {
-    // pass a full URL through as-is, else assume a personal /in/ profile
-    const url = handle.startsWith("http")
-      ? handle
-      : `https://www.linkedin.com/in/${handle}/`;
-    return `url=${encodeURIComponent(url)}`;
   }
   return `handle=${encodeURIComponent(handle)}`;
 }
@@ -127,17 +115,15 @@ export async function GET() {
     PLATFORMS.map(async ({ platform, envHandle, demo }) => {
       const handle = process.env[envHandle]?.trim();
       if (!apiKey || !handle) return demo;
-      // LinkedIn's scraper is flaky (authwall throttling) — retry once
-      const attempts = platform === "linkedin" ? 2 : 1;
-      let lastError = "fetch failed";
-      for (let i = 0; i < attempts; i++) {
-        try {
-          return await fetchProfile(platform, handle, apiKey);
-        } catch (err) {
-          lastError = err instanceof Error ? err.message : "fetch failed";
-        }
+      try {
+        return await fetchProfile(platform, handle, apiKey);
+      } catch (err) {
+        return {
+          ...demo,
+          handle,
+          error: err instanceof Error ? err.message : "fetch failed",
+        };
       }
-      return { ...demo, handle, error: lastError };
     })
   );
 

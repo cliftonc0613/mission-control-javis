@@ -33,10 +33,13 @@ export default function MissionControl() {
 
       {/* ── Main grid ──────────────────────────────────── */}
       <div className="grid grid-cols-12 gap-4 flex-1">
-        {/* Left — System telemetry */}
-        <div className="col-span-12 md:col-span-3 lg:col-span-3">
-          <HudPanel title="System Telemetry" delay={0.1} className="h-full">
+        {/* Left — System telemetry + social networks */}
+        <div className="col-span-12 md:col-span-3 lg:col-span-3 flex flex-col gap-4">
+          <HudPanel title="System Telemetry" delay={0.1}>
             <SystemStats />
+          </HudPanel>
+          <HudPanel title="Social Networks" delay={0.25} className="flex-1">
+            <SocialStats />
           </HudPanel>
         </div>
 
@@ -64,9 +67,6 @@ export default function MissionControl() {
           </HudPanel>
         </div>
       </div>
-
-      {/* ── Bottom — Social grid ───────────────────────── */}
-      <SocialStats />
 
       <footer className="text-center text-[9px] tracking-[0.4em] text-hud-orange/40 pb-2">
         CLIFTON AI MISSION CONTROL — ALL SYSTEMS NOMINAL
