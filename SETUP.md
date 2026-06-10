@@ -26,6 +26,25 @@ OpenRouter gives you one key for hundreds of models (Claude, GPT, Gemini, Llama,
 
 All providers stream responses. Voice input uses the browser Web Speech API (Chrome/Edge) — hold the 🎙 button to speak.
 
+### Voice replies (Jarvis talks back)
+
+Click the **voice toggle** in the chat header to cycle modes:
+
+| Mode | Engine | Latency |
+|---|---|---|
+| 🔇 VOICE OFF | — | — |
+| 🔊 SYSTEM | Browser speech synthesis | instant |
+| 🗣 CLIFTON | [Voicebox](https://voicebox.sh) local voice clone | ~15s+ per reply (local Qwen3-TTS on Apple Silicon) |
+
+The CLIFTON mode appears automatically when the Voicebox app is running (it serves a local API on `127.0.0.1:17493`). The dashboard proxies it through `POST /api/speak` and plays the generated WAV. Optional overrides in `.env.local`:
+
+```
+VOICEBOX_URL=http://127.0.0.1:17493
+VOICEBOX_PROFILE_ID=   # specific voice profile; defaults to your first one
+```
+
+Tip: keep replies short in clone mode — synthesis time scales with reply length. The first generation after launching Voicebox loads the model (~2-3 min); after that it stays warm.
+
 ---
 
 ## 2. Google OAuth (Calendar, Gmail, Drive)

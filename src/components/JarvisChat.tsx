@@ -24,6 +24,24 @@ const PROVIDER_LABELS: Record<Provider, string> = {
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
+type VoiceMode = "off" | "system" | "clone";
+
+const VOICE_MODE_LABELS: Record<VoiceMode, string> = {
+  off: "🔇 VOICE OFF",
+  system: "🔊 SYSTEM",
+  clone: "🗣 CLIFTON",
+};
+
+/** strip markdown/code noise so TTS reads cleanly */
+function toSpeakable(text: string): string {
+  return text
+    .replace(/```[\s\S]*?```/g, " code block omitted. ")
+    .replace(/[*_#`>|]/g, "")
+    .replace(/\[([^\]]*)\]\([^)]*\)/g, "$1")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 // Minimal Web Speech API typings (not in lib.dom for all TS configs)
 interface SpeechRecognitionLike {
   lang: string;
@@ -55,8 +73,18 @@ export default function JarvisChat() {
   const [listening, setListening] = useState(false);
   const [provider, setProvider] = useState<Provider>("anthropic");
   const [openRouterModel, setOpenRouterModel] = useState("");
+  const [voiceMode, setVoiceMode] = useState<VoiceMode>("off");
+  const [synthesizing, setSynthesizing] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  // Voicebox (local voice clone) availability
+  const { data: voiceboxData } = useSWR<{
+    online: boolean;
+    defaultProfileId: string | null;
+  }>("/api/speak", fetcher, { refreshInterval: 60000 });
+  const voiceboxOnline = voiceboxData?.online ?? false;
 
   const { data: providerData } = useSWR<{ providers: ProviderInfo[] }>(
     "/api/jarvis",
@@ -79,6 +107,8 @@ export default function JarvisChat() {
     if (saved && saved in PROVIDER_LABELS) setProvider(saved);
     const savedModel = localStorage.getItem("jarvis-openrouter-model");
     if (savedModel) setOpenRouterModel(savedModel);
+    const savedVoice = localStorage.getItem("jarvis-voice-mode") as VoiceMode | null;
+    if (savedVoice && savedVoice in VOICE_MODE_LABELS) setVoiceMode(savedVoice);
   }, []);
 
   function selectProvider(next: Provider) {
@@ -89,6 +119,71 @@ export default function JarvisChat() {
   function selectOpenRouterModel(next: string) {
     setOpenRouterModel(next);
     localStorage.setItem("jarvis-openrouter-model", next);
+  }
+
+  function cycleVoiceMode() {
+    const order: VoiceMode[] = voiceboxOnline
+      ? ["off", "system", "clone"]
+      : ["off", "system"];
+    const next = order[(order.indexOf(voiceMode) + 1) % order.length];
+    setVoiceMode(next);
+    localStorage.setItem("jarvis-voice-mode", next);
+    stopSpeaking();
+  }
+
+  function stopSpeaking() {
+    window.speechSynthesis?.cancel();
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current = null;
+    }
+  }
+
+  async function speak(text: string) {
+    const speakable = toSpeakable(text);
+    if (!speakable || voiceMode === "off") return;
+    stopSpeaking();
+
+    if (voiceMode === "system") {
+      const utterance = new SpeechSynthesisUtterance(speakable);
+      const voices = window.speechSynthesis.getVoices();
+      const preferred =
+        voices.find((v) => v.name.includes("Daniel")) ??
+        voices.find((v) => v.lang.startsWith("en"));
+      if (preferred) utterance.voice = preferred;
+      utterance.rate = 1.05;
+      window.speechSynthesis.speak(utterance);
+      return;
+    }
+
+    // clone mode — synthesize with Voicebox (can take a while)
+    setSynthesizing(true);
+    try {
+      const res = await fetch("/api/speak", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: speakable }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => null);
+        throw new Error(err?.error ?? `HTTP ${res.status}`);
+      }
+      const blob = await res.blob();
+      const audio = new Audio(URL.createObjectURL(blob));
+      audioRef.current = audio;
+      audio.onended = () => URL.revokeObjectURL(audio.src);
+      await audio.play();
+    } catch (err) {
+      setMessages((m) => [
+        ...m,
+        {
+          role: "assistant",
+          content: `[VOICE SYNTH OFFLINE] ${err instanceof Error ? err.message : "unknown"}`,
+        },
+      ]);
+    } finally {
+      setSynthesizing(false);
+    }
   }
 
   useEffect(() => {
@@ -135,6 +230,8 @@ export default function JarvisChat() {
           { role: "assistant", content: assistantText },
         ]);
       }
+
+      if (assistantText) void speak(assistantText);
     } catch (err) {
       setMessages([
         ...history,
@@ -226,6 +323,24 @@ export default function JarvisChat() {
             </button>
           );
         })}
+        <button
+          type="button"
+          onClick={cycleVoiceMode}
+          title={
+            voiceMode === "clone"
+              ? "Jarvis speaks with your Voicebox cloned voice"
+              : voiceMode === "system"
+                ? "Jarvis speaks with the browser system voice"
+                : "Voice replies disabled — click to cycle"
+          }
+          className={`px-2 py-1 text-[9px] tracking-widest border transition-colors ${
+            voiceMode !== "off"
+              ? "border-hud-orange bg-hud-orange/15 text-hud-orange text-glow font-bold"
+              : "border-hud-orange/30 text-hud-orange/50 hover:border-hud-orange/60"
+          } ${synthesizing ? "mic-active" : ""}`}
+        >
+          {synthesizing ? "⏳ SYNTH…" : VOICE_MODE_LABELS[voiceMode]}
+        </button>
         {provider === "openrouter" ? (
           <select
             value={openRouterModel || activeInfo?.model || ""}
