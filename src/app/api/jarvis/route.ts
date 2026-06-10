@@ -167,9 +167,14 @@ async function streamOpenAICompatible(
 }
 
 export async function POST(req: Request) {
-  const { messages, provider = "anthropic" } = (await req.json()) as {
+  const {
+    messages,
+    provider = "anthropic",
+    model: requestedModel,
+  } = (await req.json()) as {
     messages: ChatMessage[];
     provider?: Provider;
+    model?: string;
   };
 
   const config = PROVIDER_CONFIG[provider];
@@ -182,7 +187,11 @@ export async function POST(req: Request) {
     );
   }
 
-  const model = process.env[config.modelEnv] ?? config.defaultModel;
+  // OpenRouter supports picking any catalog model from the UI dropdown
+  const model =
+    provider === "openrouter" && requestedModel?.trim()
+      ? requestedModel.trim()
+      : process.env[config.modelEnv] ?? config.defaultModel;
   const history = messages.slice(-20);
 
   try {

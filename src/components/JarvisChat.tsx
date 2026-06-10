@@ -54,6 +54,7 @@ export default function JarvisChat() {
   const [streaming, setStreaming] = useState(false);
   const [listening, setListening] = useState(false);
   const [provider, setProvider] = useState<Provider>("anthropic");
+  const [openRouterModel, setOpenRouterModel] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
 
@@ -64,15 +65,30 @@ export default function JarvisChat() {
   const providers = providerData?.providers ?? [];
   const activeInfo = providers.find((p) => p.id === provider);
 
-  // restore last-used provider
+  // fetch the OpenRouter catalog only while OpenRouter is selected
+  const { data: catalogData } = useSWR<{
+    models: { id: string; name: string }[];
+  }>(provider === "openrouter" ? "/api/jarvis/models" : null, fetcher, {
+    revalidateOnFocus: false,
+  });
+  const catalog = catalogData?.models ?? [];
+
+  // restore last-used provider + OpenRouter model
   useEffect(() => {
     const saved = localStorage.getItem("jarvis-provider") as Provider | null;
     if (saved && saved in PROVIDER_LABELS) setProvider(saved);
+    const savedModel = localStorage.getItem("jarvis-openrouter-model");
+    if (savedModel) setOpenRouterModel(savedModel);
   }, []);
 
   function selectProvider(next: Provider) {
     setProvider(next);
     localStorage.setItem("jarvis-provider", next);
+  }
+
+  function selectOpenRouterModel(next: string) {
+    setOpenRouterModel(next);
+    localStorage.setItem("jarvis-openrouter-model", next);
   }
 
   useEffect(() => {
@@ -92,7 +108,13 @@ export default function JarvisChat() {
       const res = await fetch("/api/jarvis", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages: history, provider }),
+        body: JSON.stringify({
+          messages: history,
+          provider,
+          ...(provider === "openrouter" && openRouterModel
+            ? { model: openRouterModel }
+            : {}),
+        }),
       });
 
       if (!res.ok || !res.body) {
@@ -204,10 +226,30 @@ export default function JarvisChat() {
             </button>
           );
         })}
-        {activeInfo && (
-          <span className="text-[9px] text-hud-orange/40 ml-auto truncate max-w-[40%]">
-            {activeInfo.model}
-          </span>
+        {provider === "openrouter" ? (
+          <select
+            value={openRouterModel || activeInfo?.model || ""}
+            onChange={(e) => selectOpenRouterModel(e.target.value)}
+            className="ml-1 max-w-[45%] bg-hud-bg border border-hud-orange/40 text-hud-orange text-[9px] tracking-wider px-1 py-1 focus:outline-none focus:border-hud-orange focus:shadow-[0_0_8px_rgba(246,102,2,0.4)] cursor-pointer"
+            title="Pick any OpenRouter model"
+          >
+            {catalog.length === 0 && (
+              <option value={activeInfo?.model ?? ""}>
+                {activeInfo?.model ?? "loading catalog…"}
+              </option>
+            )}
+            {catalog.map((m) => (
+              <option key={m.id} value={m.id} className="bg-hud-bg">
+                {m.id}
+              </option>
+            ))}
+          </select>
+        ) : (
+          activeInfo && (
+            <span className="text-[9px] text-hud-orange/40 ml-auto truncate max-w-[40%]">
+              {activeInfo.model}
+            </span>
+          )
         )}
       </div>
 
