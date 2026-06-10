@@ -2,6 +2,51 @@
 
 import { useEffect, useRef, useState } from "react";
 import useSWR from "swr";
+import { voiceStore } from "@/lib/voiceStore";
+
+// ── live audio analysis → arc reactor visualizer ───────────
+let audioCtx: AudioContext | null = null;
+
+/** route an <audio> element through an analyser; updates voiceStore.level */
+function attachAnalyser(audio: HTMLAudioElement): () => void {
+  try {
+    audioCtx ??= new AudioContext();
+    void audioCtx.resume();
+    const source = audioCtx.createMediaElementSource(audio);
+    const analyser = audioCtx.createAnalyser();
+    analyser.fftSize = 256;
+    source.connect(analyser);
+    analyser.connect(audioCtx.destination);
+
+    const data = new Uint8Array(analyser.frequencyBinCount);
+    let raf = 0;
+    const loop = () => {
+      analyser.getByteFrequencyData(data);
+      let sum = 0;
+      for (let i = 0; i < data.length; i++) sum += data[i];
+      voiceStore.set({ level: Math.min(1, (sum / data.length / 255) * 2.2) });
+      raf = requestAnimationFrame(loop);
+    };
+    loop();
+    return () => cancelAnimationFrame(raf);
+  } catch {
+    // analyser unavailable — fall back to a steady pulse
+    voiceStore.set({ level: 0.5 });
+    return () => {};
+  }
+}
+
+/** simulated amplitude for engines without analysable audio (system TTS) */
+function startSimulatedLevel(): () => void {
+  let t = 0;
+  const id = setInterval(() => {
+    t += 0.4;
+    voiceStore.set({
+      level: 0.35 + 0.3 * Math.abs(Math.sin(t)) + Math.random() * 0.2,
+    });
+  }, 80);
+  return () => clearInterval(id);
+}
 
 interface ChatMessage {
   role: "user" | "assistant";
@@ -151,6 +196,7 @@ export default function JarvisChat() {
       audioRef.current.pause();
       audioRef.current = null;
     }
+    voiceStore.set({ speaking: false, level: 0 });
   }
 
   async function fetchChunkAudio(chunk: string): Promise<Blob> {
@@ -171,12 +217,22 @@ export default function JarvisChat() {
       if (session !== speakSessionRef.current) return resolve();
       const audio = new Audio(URL.createObjectURL(blob));
       audioRef.current = audio;
-      audio.onended = () => {
+      voiceStore.set({ speaking: true });
+      const detach = attachAnalyser(audio);
+      const finish = () => {
+        detach();
         URL.revokeObjectURL(audio.src);
         resolve();
       };
-      audio.onerror = () => reject(new Error("audio playback failed"));
-      audio.play().catch(reject);
+      audio.onended = finish;
+      audio.onerror = () => {
+        detach();
+        reject(new Error("audio playback failed"));
+      };
+      audio.play().catch((err) => {
+        detach();
+        reject(err);
+      });
     });
   }
 
@@ -194,6 +250,18 @@ export default function JarvisChat() {
         voices.find((v) => v.lang.startsWith("en"));
       if (preferred) utterance.voice = preferred;
       utterance.rate = 1.05;
+      // system TTS exposes no audio stream — simulate reactor amplitude
+      let stopSim: (() => void) | null = null;
+      utterance.onstart = () => {
+        voiceStore.set({ speaking: true });
+        stopSim = startSimulatedLevel();
+      };
+      const settle = () => {
+        stopSim?.();
+        voiceStore.set({ speaking: false, level: 0 });
+      };
+      utterance.onend = settle;
+      utterance.onerror = settle;
       window.speechSynthesis.speak(utterance);
       return;
     }
@@ -223,6 +291,9 @@ export default function JarvisChat() {
       }
     } finally {
       setSynthesizing(false);
+      if (session === speakSessionRef.current) {
+        voiceStore.set({ speaking: false, level: 0 });
+      }
     }
   }
 

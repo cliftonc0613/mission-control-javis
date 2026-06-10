@@ -237,6 +237,23 @@ body {
   animation: core-pulse 2.4s ease-in-out infinite;
 }
 
+/* speech mode — rings throttle up while Jarvis talks */
+.reactor-talking .reactor-spin {
+  animation-duration: 3.5s;
+}
+
+.reactor-talking .reactor-spin-reverse {
+  animation-duration: 2.2s;
+}
+
+.reactor-talking .reactor-spin-fast {
+  animation-duration: 1s;
+}
+
+.reactor-talking .reactor-core {
+  animation-duration: 0.8s;
+}
+
 @keyframes core-pulse {
   0%, 100% { opacity: 0.85; }
   50% { opacity: 1; }
