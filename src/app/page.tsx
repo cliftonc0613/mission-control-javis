@@ -46,8 +46,12 @@ export default function MissionControl() {
         {/* Center — Arc reactor + Jarvis */}
         <div className="col-span-12 md:col-span-9 lg:col-span-6">
           <HudPanel delay={0} className="h-full flex flex-col">
-            <ArcReactor size={150} />
-            <div className="flex flex-col">
+            {/* reactor is the centerpiece — fills the open space, centered */}
+            <div className="flex-1 flex items-center justify-center py-2">
+              <ArcReactor size={320} />
+            </div>
+            {/* chat anchored to the bottom of the panel */}
+            <div className="flex flex-col mt-auto">
               <h2 className="hud-panel-title">Jarvis Interface</h2>
               <JarvisChat />
             </div>
