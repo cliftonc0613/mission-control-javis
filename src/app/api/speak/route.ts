@@ -1,8 +1,6 @@
-export const dynamic = "force-dynamic";
+import { resolveVoiceboxUrl } from "@/lib/voicebox";
 
-// Voicebox (voicebox.sh) — local voice-cloning TTS server bundled with the
-// macOS app. The dashboard proxies it so the browser avoids CORS issues.
-const VOICEBOX_URL = process.env.VOICEBOX_URL ?? "http://127.0.0.1:17493";
+export const dynamic = "force-dynamic";
 
 interface VoiceProfile {
   id: string;
@@ -13,10 +11,20 @@ interface VoiceProfile {
 
 /** GET /api/speak — Voicebox status + available cloned voice profiles */
 export async function GET() {
+  const baseUrl = await resolveVoiceboxUrl();
+  if (!baseUrl) {
+    return Response.json({
+      online: false,
+      modelLoaded: false,
+      profiles: [],
+      defaultProfileId: null,
+    });
+  }
+
   try {
     const [healthRes, profilesRes] = await Promise.all([
-      fetch(`${VOICEBOX_URL}/health`, { signal: AbortSignal.timeout(2000) }),
-      fetch(`${VOICEBOX_URL}/profiles`, { signal: AbortSignal.timeout(2000) }),
+      fetch(`${baseUrl}/health`, { signal: AbortSignal.timeout(2000) }),
+      fetch(`${baseUrl}/profiles`, { signal: AbortSignal.timeout(2000) }),
     ]);
     if (!healthRes.ok || !profilesRes.ok) throw new Error("voicebox error");
 
@@ -25,6 +33,7 @@ export async function GET() {
 
     return Response.json({
       online: true,
+      url: baseUrl,
       modelLoaded: Boolean(health.model_loaded),
       profiles: profiles.map((p) => ({ id: p.id, name: p.name })),
       defaultProfileId:
@@ -52,10 +61,18 @@ export async function POST(req: Request) {
     return Response.json({ error: "No text provided" }, { status: 400 });
   }
 
+  const baseUrl = await resolveVoiceboxUrl();
+  if (!baseUrl) {
+    return Response.json(
+      { error: "Voicebox is not running — launch the Voicebox app and try again." },
+      { status: 502 }
+    );
+  }
+
   try {
     let profile = profileId ?? process.env.VOICEBOX_PROFILE_ID;
     if (!profile) {
-      const profilesRes = await fetch(`${VOICEBOX_URL}/profiles`, {
+      const profilesRes = await fetch(`${baseUrl}/profiles`, {
         signal: AbortSignal.timeout(2000),
       });
       const profiles = (await profilesRes.json()) as VoiceProfile[];
@@ -64,7 +81,7 @@ export async function POST(req: Request) {
     if (!profile) throw new Error("No Voicebox voice profiles found");
 
     // generation can take a while for long replies — allow up to 5 min
-    const genRes = await fetch(`${VOICEBOX_URL}/generate`, {
+    const genRes = await fetch(`${baseUrl}/generate`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ profile_id: profile, text: cleaned }),
@@ -76,7 +93,7 @@ export async function POST(req: Request) {
     }
     const generation = (await genRes.json()) as { id: string };
 
-    const audioRes = await fetch(`${VOICEBOX_URL}/audio/${generation.id}`, {
+    const audioRes = await fetch(`${baseUrl}/audio/${generation.id}`, {
       signal: AbortSignal.timeout(30000),
     });
     if (!audioRes.ok || !audioRes.body) {
