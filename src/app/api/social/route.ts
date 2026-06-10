@@ -48,35 +48,61 @@ function pick(obj: Record<string, unknown> | undefined, keys: string[]): number 
   return 0;
 }
 
+// Facebook and LinkedIn profile endpoints take a full `url`; the rest take `handle`.
+function profileQuery(platform: string, handle: string): string {
+  if (platform === "facebook") {
+    return `url=${encodeURIComponent(`https://www.facebook.com/${handle}`)}`;
+  }
+  if (platform === "linkedin") {
+    // pass a full URL through as-is, else assume a personal /in/ profile
+    const url = handle.startsWith("http")
+      ? handle
+      : `https://www.linkedin.com/in/${handle}/`;
+    return `url=${encodeURIComponent(url)}`;
+  }
+  return `handle=${encodeURIComponent(handle)}`;
+}
+
 async function fetchProfile(
   platform: string,
   handle: string,
   apiKey: string
 ): Promise<SocialStat> {
   const res = await fetch(
-    `${BASE}/${platform}/profile?handle=${encodeURIComponent(handle)}`,
+    `${BASE}/${platform}/profile?${profileQuery(platform, handle)}`,
     {
       headers: { "x-api-key": apiKey },
       next: { revalidate: 300 },
     }
   );
 
+  const json = (await res.json().catch(() => ({}))) as {
+    data?: Record<string, unknown>;
+    error?: { message?: string };
+  } & Record<string, unknown>;
+
   if (!res.ok) {
-    throw new Error(`${platform} HTTP ${res.status}`);
+    throw new Error(json.error?.message ?? `${platform} HTTP ${res.status}`);
   }
 
-  const json = (await res.json()) as { data?: Record<string, unknown> } & Record<string, unknown>;
   const data = (json.data ?? json) as Record<string, unknown>;
-  const stats = (data.stats ?? data.statistics ?? data) as Record<string, unknown>;
+  // SocialCrawl nests profile stats under data.author (Author response type)
+  const author = (data.author ?? {}) as Record<string, unknown>;
+  const stats = (data.stats ?? data.statistics ?? {}) as Record<string, unknown>;
+  const sources = { ...(data as object), ...stats, ...author } as Record<
+    string,
+    unknown
+  >;
 
-  const followers = pick(stats, [
+  const followers = pick(sources, [
     "followers",
     "follower_count",
     "followerCount",
     "followers_count",
     "fan_count",
   ]);
-  const posts = pick(stats, [
+  const posts = pick(sources, [
+    "posts_count",
     "posts",
     "post_count",
     "postCount",
@@ -84,9 +110,9 @@ async function fetchProfile(
     "tweet_count",
     "statuses_count",
   ]);
-  const avgLikes = pick(stats, ["avg_likes", "average_likes", "avgLikes"]);
+  const avgLikes = pick(sources, ["avg_likes", "average_likes", "avgLikes"]);
   const engagement =
-    pick(stats, ["engagement_rate", "engagementRate"]) ||
+    pick(sources, ["engagement_rate", "engagementRate"]) ||
     (followers > 0 && avgLikes > 0
       ? Math.round((avgLikes / followers) * 1000) / 10
       : 0);
@@ -99,7 +125,7 @@ export async function GET() {
 
   const results = await Promise.all(
     PLATFORMS.map(async ({ platform, envHandle, demo }) => {
-      const handle = process.env[envHandle];
+      const handle = process.env[envHandle]?.trim();
       if (!apiKey || !handle) return demo;
       try {
         return await fetchProfile(platform, handle, apiKey);
