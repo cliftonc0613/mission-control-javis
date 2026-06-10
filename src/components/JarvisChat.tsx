@@ -42,6 +42,28 @@ function toSpeakable(text: string): string {
     .trim();
 }
 
+/**
+ * Split text into sentence chunks (~target chars each) so the clone voice
+ * can start speaking after the first chunk instead of the whole reply.
+ */
+function toChunks(text: string, target = 160): string[] {
+  const sentences = text.match(/[^.!?]+[.!?]+["')\]]*|\S[^.!?]*$/g) ?? [text];
+  const chunks: string[] = [];
+  // first chunk = first sentence alone, so speech starts as early as possible
+  if (sentences.length > 1) chunks.push(sentences.shift()!.trim());
+  let current = "";
+  for (const s of sentences) {
+    if (current && current.length + s.length > target) {
+      chunks.push(current.trim());
+      current = s;
+    } else {
+      current += s;
+    }
+  }
+  if (current.trim()) chunks.push(current.trim());
+  return chunks;
+}
+
 // Minimal Web Speech API typings (not in lib.dom for all TS configs)
 interface SpeechRecognitionLike {
   lang: string;
@@ -78,6 +100,7 @@ export default function JarvisChat() {
   const scrollRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const speakSessionRef = useRef(0);
 
   // Voicebox (local voice clone) availability
   const { data: voiceboxData } = useSWR<{
@@ -122,6 +145,7 @@ export default function JarvisChat() {
   }
 
   function stopSpeaking() {
+    speakSessionRef.current++;
     window.speechSynthesis?.cancel();
     if (audioRef.current) {
       audioRef.current.pause();
@@ -129,10 +153,38 @@ export default function JarvisChat() {
     }
   }
 
+  async function fetchChunkAudio(chunk: string): Promise<Blob> {
+    const res = await fetch("/api/speak", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text: chunk }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => null);
+      throw new Error(err?.error ?? `HTTP ${res.status}`);
+    }
+    return res.blob();
+  }
+
+  function playBlob(blob: Blob, session: number): Promise<void> {
+    return new Promise((resolve, reject) => {
+      if (session !== speakSessionRef.current) return resolve();
+      const audio = new Audio(URL.createObjectURL(blob));
+      audioRef.current = audio;
+      audio.onended = () => {
+        URL.revokeObjectURL(audio.src);
+        resolve();
+      };
+      audio.onerror = () => reject(new Error("audio playback failed"));
+      audio.play().catch(reject);
+    });
+  }
+
   async function speak(text: string) {
     const speakable = toSpeakable(text);
     if (!speakable || voiceMode === "off") return;
     stopSpeaking();
+    const session = speakSessionRef.current;
 
     if (voiceMode === "system") {
       const utterance = new SpeechSynthesisUtterance(speakable);
@@ -146,31 +198,29 @@ export default function JarvisChat() {
       return;
     }
 
-    // clone mode — synthesize with Voicebox (can take a while)
+    // clone mode — pipeline sentence chunks: play chunk N while N+1 generates
     setSynthesizing(true);
     try {
-      const res = await fetch("/api/speak", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: speakable }),
-      });
-      if (!res.ok) {
-        const err = await res.json().catch(() => null);
-        throw new Error(err?.error ?? `HTTP ${res.status}`);
+      const chunks = toChunks(speakable);
+      let nextFetch: Promise<Blob> = fetchChunkAudio(chunks[0]);
+
+      for (let i = 0; i < chunks.length; i++) {
+        const blob = await nextFetch;
+        if (session !== speakSessionRef.current) return;
+        if (i + 1 < chunks.length) nextFetch = fetchChunkAudio(chunks[i + 1]);
+        setSynthesizing(false); // first audio is ready — indicator off while talking
+        await playBlob(blob, session);
       }
-      const blob = await res.blob();
-      const audio = new Audio(URL.createObjectURL(blob));
-      audioRef.current = audio;
-      audio.onended = () => URL.revokeObjectURL(audio.src);
-      await audio.play();
     } catch (err) {
-      setMessages((m) => [
-        ...m,
-        {
-          role: "assistant",
-          content: `[VOICE SYNTH OFFLINE] ${err instanceof Error ? err.message : "unknown"}`,
-        },
-      ]);
+      if (session === speakSessionRef.current) {
+        setMessages((m) => [
+          ...m,
+          {
+            role: "assistant",
+            content: `[VOICE SYNTH OFFLINE] ${err instanceof Error ? err.message : "unknown"}`,
+          },
+        ]);
+      }
     } finally {
       setSynthesizing(false);
     }
@@ -196,6 +246,7 @@ export default function JarvisChat() {
         body: JSON.stringify({
           messages: history,
           provider,
+          voice: voiceMode === "clone",
           ...(provider === "openrouter" && openRouterModel
             ? { model: openRouterModel }
             : {}),

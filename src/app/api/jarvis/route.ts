@@ -60,13 +60,14 @@ export async function GET() {
 function streamAnthropic(
   apiKey: string,
   model: string,
-  messages: ChatMessage[]
+  messages: ChatMessage[],
+  systemPrompt: string
 ): ReadableStream<Uint8Array> {
   const anthropic = new Anthropic({ apiKey });
   const stream = anthropic.messages.stream({
     model,
     max_tokens: 1024,
-    system: SYSTEM_PROMPT,
+    system: systemPrompt,
     messages,
   });
 
@@ -101,6 +102,7 @@ async function streamOpenAICompatible(
   apiKey: string,
   model: string,
   messages: ChatMessage[],
+  systemPrompt: string,
   extraHeaders: Record<string, string> = {}
 ): Promise<ReadableStream<Uint8Array>> {
   const res = await fetch(`${baseUrl}/chat/completions`, {
@@ -114,7 +116,7 @@ async function streamOpenAICompatible(
       model,
       stream: true,
       max_tokens: 1024,
-      messages: [{ role: "system", content: SYSTEM_PROMPT }, ...messages],
+      messages: [{ role: "system", content: systemPrompt }, ...messages],
     }),
   });
 
@@ -171,10 +173,12 @@ export async function POST(req: Request) {
     messages,
     provider = "anthropic",
     model: requestedModel,
+    voice = false,
   } = (await req.json()) as {
     messages: ChatMessage[];
     provider?: Provider;
     model?: string;
+    voice?: boolean;
   };
 
   const config = PROVIDER_CONFIG[provider];
@@ -193,17 +197,21 @@ export async function POST(req: Request) {
       ? requestedModel.trim()
       : process.env[config.modelEnv] ?? config.defaultModel;
   const history = messages.slice(-20);
+  const systemPrompt = voice
+    ? `${SYSTEM_PROMPT}\nVoice output is currently active — keep replies to 1-2 short sentences so speech synthesis stays snappy.`
+    : SYSTEM_PROMPT;
 
   try {
     let body: ReadableStream<Uint8Array>;
     if (provider === "anthropic") {
-      body = streamAnthropic(apiKey, model, history);
+      body = streamAnthropic(apiKey, model, history, systemPrompt);
     } else if (provider === "openai") {
       body = await streamOpenAICompatible(
         "https://api.openai.com/v1",
         apiKey,
         model,
-        history
+        history,
+        systemPrompt
       );
     } else {
       body = await streamOpenAICompatible(
@@ -211,6 +219,7 @@ export async function POST(req: Request) {
         apiKey,
         model,
         history,
+        systemPrompt,
         {
           "HTTP-Referer": "http://localhost:3000",
           "X-Title": "CLIFTON AI Mission Control",

@@ -51,9 +51,10 @@ export async function GET() {
 
 /** POST /api/speak — generate speech with the cloned voice, return WAV audio */
 export async function POST(req: Request) {
-  const { text, profileId } = (await req.json()) as {
+  const { text, profileId, modelSize } = (await req.json()) as {
     text: string;
     profileId?: string;
+    modelSize?: "0.6B" | "1.7B";
   };
 
   const cleaned = text?.trim().slice(0, 4900);
@@ -84,7 +85,13 @@ export async function POST(req: Request) {
     const genRes = await fetch(`${baseUrl}/generate`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ profile_id: profile, text: cleaned }),
+      body: JSON.stringify({
+        profile_id: profile,
+        text: cleaned,
+        // 0.6B is ~3x faster than 1.7B with near-identical clone quality
+        model_size:
+          modelSize ?? process.env.VOICEBOX_MODEL_SIZE ?? "0.6B",
+      }),
       signal: AbortSignal.timeout(300000),
     });
     if (!genRes.ok) {
