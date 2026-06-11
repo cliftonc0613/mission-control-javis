@@ -39,6 +39,9 @@ export async function GET() {
           from: h("From").replace(/<.*>/, "").trim(),
           date: h("Date"),
           unread: msg.data.labelIds?.includes("UNREAD") ?? false,
+          link: msg.data.threadId
+            ? `https://mail.google.com/mail/u/0/#all/${msg.data.threadId}`
+            : null,
         };
       })
     );

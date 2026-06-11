@@ -17,7 +17,7 @@ export async function GET() {
       drive.files.list({
         pageSize: 5,
         orderBy: "modifiedTime desc",
-        fields: "files(id, name, mimeType, modifiedTime)",
+        fields: "files(id, name, mimeType, modifiedTime, webViewLink)",
         q: "trashed = false",
       }),
       drive.about.get({ fields: "storageQuota" }),
@@ -31,6 +31,7 @@ export async function GET() {
         name: f.name,
         mimeType: f.mimeType,
         modifiedTime: f.modifiedTime,
+        link: f.webViewLink ?? null,
       })),
       storage: {
         used: Number(quota?.usage ?? 0),

@@ -9,6 +9,31 @@ interface CalendarEvent {
   start: string | null;
   allDay: boolean;
   location: string | null;
+  link: string | null;
+}
+
+/** Row that opens its Google link in a new tab; plain div when no link. */
+function LinkRow({
+  link,
+  children,
+  className = "",
+}: {
+  link: string | null;
+  children: React.ReactNode;
+  className?: string;
+}) {
+  if (!link) return <div className={className}>{children}</div>;
+  return (
+    <a
+      href={link}
+      target="_blank"
+      rel="noopener noreferrer"
+      className={`block hover:bg-hud-orange/10 transition-colors ${className}`}
+      title="Open in Google"
+    >
+      {children}
+    </a>
+  );
 }
 
 function Offline({ message }: { message?: string }) {
@@ -50,10 +75,10 @@ export function CalendarSection() {
         <p className="text-hud-orange/60">NO REMAINING EVENTS TODAY</p>
       )}
       {today.map((e, i) => (
-        <div key={i} className="flex gap-2">
+        <LinkRow key={i} link={e.link} className="flex gap-2">
           <span className="text-glow-white shrink-0">{eventTime(e)}</span>
           <span className="truncate text-hud-orange/90">{e.title}</span>
-        </div>
+        </LinkRow>
       ))}
       {upcoming.length > 0 && (
         <>
@@ -61,7 +86,7 @@ export function CalendarSection() {
             ── UPCOMING ──
           </div>
           {upcoming.map((e, i) => (
-            <div key={i} className="flex gap-2">
+            <LinkRow key={i} link={e.link} className="flex gap-2">
               <span className="text-hud-orange/60 shrink-0">
                 {e.start
                   ? new Date(e.start).toLocaleDateString([], {
@@ -71,7 +96,7 @@ export function CalendarSection() {
                   : "—"}
               </span>
               <span className="truncate text-hud-orange/80">{e.title}</span>
-            </div>
+            </LinkRow>
           ))}
         </>
       )}
@@ -96,14 +121,22 @@ export function GmailSection() {
         </span>
       </div>
       {(data.messages ?? []).map(
-        (m: { subject: string; from: string; unread: boolean }, i: number) => (
-          <div key={i} className="truncate">
+        (
+          m: {
+            subject: string;
+            from: string;
+            unread: boolean;
+            link: string | null;
+          },
+          i: number
+        ) => (
+          <LinkRow key={i} link={m.link} className="truncate">
             <span className={m.unread ? "text-glow-white" : "text-hud-orange/60"}>
               {m.unread ? "●" : "○"}
             </span>{" "}
             <span className="text-hud-orange/90">{m.subject}</span>{" "}
             <span className="text-hud-orange/50">— {m.from}</span>
-          </div>
+          </LinkRow>
         )
       )}
     </div>
@@ -121,11 +154,13 @@ export function DriveSection() {
 
   return (
     <div className="text-[11px] space-y-1">
-      {(data.files ?? []).map((f: { name: string }, i: number) => (
-        <div key={i} className="truncate text-hud-orange/90">
-          ▸ {f.name}
-        </div>
-      ))}
+      {(data.files ?? []).map(
+        (f: { name: string; link: string | null }, i: number) => (
+          <LinkRow key={i} link={f.link} className="truncate text-hud-orange/90">
+            ▸ {f.name}
+          </LinkRow>
+        )
+      )}
       <div className="pt-2">
         <div className="hud-bar-track">
           <div className="hud-bar-fill" style={{ width: `${percent}%` }} />

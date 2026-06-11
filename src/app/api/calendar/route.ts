@@ -39,11 +39,13 @@ export async function GET() {
       summary?: string | null;
       start?: { dateTime?: string | null; date?: string | null } | null;
       location?: string | null;
+      htmlLink?: string | null;
     }) => ({
       title: e.summary ?? "(untitled)",
       start: e.start?.dateTime ?? e.start?.date ?? null,
       allDay: !e.start?.dateTime,
       location: e.location ?? null,
+      link: e.htmlLink ?? null,
     });
 
     return Response.json({
