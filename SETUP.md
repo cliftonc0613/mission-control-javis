@@ -59,27 +59,22 @@ Tip: keep replies short in clone mode — synthesis time scales with reply lengt
 3. **APIs & Services → OAuth consent screen**: configure as *External*, add your Google account as a **test user**.
 4. **APIs & Services → Credentials → Create Credentials → OAuth client ID**:
    - Application type: **Web application**
-   - Authorized redirect URI: `https://developers.google.com/oauthplayground`
-5. Copy the **Client ID** and **Client Secret** into `.env.local`.
-
-### 2b. Get a refresh token (OAuth Playground)
-
-1. Open [developers.google.com/oauthplayground](https://developers.google.com/oauthplayground).
-2. Click the ⚙️ gear (top right) → check **Use your own OAuth credentials** → paste your Client ID + Secret.
-3. In the left scope list, select (or paste into the input box):
-   ```
-   https://www.googleapis.com/auth/calendar.readonly
-   https://www.googleapis.com/auth/gmail.readonly
-   https://www.googleapis.com/auth/drive.readonly
-   ```
-4. Click **Authorize APIs** → sign in with your Google account → allow.
-5. Click **Exchange authorization code for tokens**.
-6. Copy the **Refresh token** into `.env.local`:
+   - Authorized redirect URI: `http://localhost:3000/oauth2callback`
+5. Copy the **Client ID** and **Client Secret** into `.env.local`:
    ```
    GOOGLE_CLIENT_ID=xxxx.apps.googleusercontent.com
    GOOGLE_CLIENT_SECRET=GOCSPX-...
-   GOOGLE_REFRESH_TOKEN=1//0g...
    ```
+
+### 2b. Get a refresh token (helper script)
+
+```bash
+node scripts/google-oauth.mjs
+```
+
+The script opens the Google consent screen, catches the redirect locally,
+and writes `GOOGLE_REFRESH_TOKEN` into `.env.local` automatically.
+Sign in, click **Allow**, done — then restart the dev server.
 
 > **Note:** While the consent screen is in "Testing" mode, refresh tokens expire after 7 days. Publish the app (no verification needed for personal use with these scopes on your own account) for a long-lived token.
 
