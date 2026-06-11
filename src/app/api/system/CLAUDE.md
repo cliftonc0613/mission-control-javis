@@ -7,8 +7,7 @@
 
 | ID | Time | T | Title | Read |
 |----|------|---|-------|------|
-| #10446 | 5:23 PM | 🟣 | Social Media Stats Integration via SocialCrawl API | ~397 |
-| #10430 | 4:31 PM | 🔴 | LinkedIn API retry logic implemented to handle authwall throttling | ~423 |
+| #10445 | 5:23 PM | 🟣 | Live System Telemetry with 2-Second Polling | ~208 |
 | #10409 | 2:27 AM | 🔵 | Next.js API route architecture patterns | ~376 |
-| #10331 | 12:57 AM | 🟣 | Social media stats API with SocialCrawl integration and demo fallback | ~631 |
+| #10325 | 12:56 AM | 🟣 | System telemetry API endpoint created for real-time stats panel | ~521 |
 </claude-mem-context>

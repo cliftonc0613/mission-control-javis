@@ -7,8 +7,8 @@
 
 | ID | Time | T | Title | Read |
 |----|------|---|-------|------|
-| #10446 | 5:23 PM | 🟣 | Social Media Stats Integration via SocialCrawl API | ~397 |
-| #10430 | 4:31 PM | 🔴 | LinkedIn API retry logic implemented to handle authwall throttling | ~423 |
+| #10442 | 5:23 PM | 🟣 | Multi-Provider Streaming Chat with Jarvis AI | ~295 |
 | #10409 | 2:27 AM | 🔵 | Next.js API route architecture patterns | ~376 |
-| #10331 | 12:57 AM | 🟣 | Social media stats API with SocialCrawl integration and demo fallback | ~631 |
+| #10360 | 1:19 AM | 🟣 | OpenRouter model picker dropdown UI implemented in JARVIS chat panel | ~508 |
+| #10355 | 1:16 AM | 🟣 | OpenRouter model catalog endpoint for dynamic model selection | ~530 |
 </claude-mem-context>
